@@ -10,10 +10,13 @@ def call(Map config = [:]) {
         boolean shouldAbort = determineShouldAbort(abortPipeline, branchName)
         echo "¿Abortar si falla QualityGate?: ${shouldAbort}"
         
+        // Ejecución del análisis con timeout de 5 minutos
         timeout(time: 5, unit: 'MINUTES') {
-            withEnv(['SONAR_ENV=true']) {
+            // Usar SonarQube Scanner
+            withSonarQubeEnv('SonarQube') {
                 sh '''
-                    echo "Iniciando escaneo de código estático..."
+                    echo "Iniciando escaneo de código estático con SonarQube..."
+                    echo "Analizando estructura del proyecto..."
                     sleep 2
                     echo "Verificando convenciones de nombres..."
                     sleep 2
@@ -21,6 +24,14 @@ def call(Map config = [:]) {
                     sleep 2
                     echo "Buscando vulnerabilidades de seguridad..."
                     sleep 2
+                    
+                    # Ejecutar SonarQube Scanner
+                    sonar-scanner \
+                        -Dsonar.projectKey=carlos-vargas-libreria \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.login=$SONAR_AUTH_TOKEN
+                    
                     echo "Ejecución de las pruebas de calidad de código"
                     sleep 2
                     echo "Generando reporte de análisis..."
@@ -31,16 +42,14 @@ def call(Map config = [:]) {
         }
         
         echo "Análisis estático completado exitosamente"
-        echo "Evaluando QualityGate..."
-        boolean qualityGatePassed = true
         
-        if (!qualityGatePassed && shouldAbort) {
-            error("QualityGate falló en rama '${branchName}' y debe abortarse el pipeline.")
-        } else if (!qualityGatePassed) {
-            echo "Advertencia: QualityGate falló en rama '${branchName}' pero el pipeline continúa"
-        } else {
-            echo "QualityGate pasó correctamente"
+        // Esperar y evaluar el QualityGate
+        echo "Evaluando QualityGate..."
+        timeout(time: 5, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: shouldAbort
         }
+        
+        echo "QualityGate evaluado correctamente"
         
     } catch (Exception e) {
         echo "Error en el análisis estático: ${e.message}"
@@ -49,12 +58,10 @@ def call(Map config = [:]) {
 }
 
 def getBranchName() {
-    // Intenta obtener desde BRANCH_NAME (multibranch o parámetro)
     if (env.BRANCH_NAME) {
         return env.BRANCH_NAME
     }
     
-    // Intenta obtener desde GIT_BRANCH
     if (env.GIT_BRANCH) {
         String branch = env.GIT_BRANCH
         if (branch.contains('/')) {
