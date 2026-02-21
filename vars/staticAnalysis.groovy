@@ -56,24 +56,30 @@ def call(Map config = [:]) {
 }
 
 /**
- * Obtiene el nombre de la rama actual desde el entorno de Jenkins
+ * Obtiene el nombre de la rama actual desde las variables de entorno de Jenkins
  */
 def getBranchName() {
     try {
-        // Intenta obtener el nombre de la rama desde BRANCH_NAME (disponible en multibranch pipelines)
+        // Intenta obtener desde BRANCH_NAME (multibranch pipelines)
         if (env.BRANCH_NAME) {
             return env.BRANCH_NAME
         }
         
-        // Si no está disponible, intenta obtenerla desde Git
-        String branch = sh(
-            script: 'git rev-parse --abbrev-ref HEAD',
-            returnStdout: true
-        ).trim()
+        // Intenta obtener desde GIT_BRANCH y extrae el nombre sin "origin/"
+        if (env.GIT_BRANCH) {
+            String branch = env.GIT_BRANCH
+            // Elimina el prefijo "origin/" si existe
+            if (branch.contains('/')) {
+                branch = branch.substring(branch.lastIndexOf('/') + 1)
+            }
+            return branch
+        }
         
-        return branch
+        // Si nada funciona, retorna unknown
+        echo "Advertencia: No se pudo obtener el nombre de la rama desde variables de entorno"
+        return "unknown"
     } catch (Exception e) {
-        echo "Advertencia: No se pudo obtener el nombre de la rama: ${e.message}"
+        echo "Advertencia: Error al obtener el nombre de la rama: ${e.message}"
         return "unknown"
     }
 }
