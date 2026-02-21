@@ -1,11 +1,9 @@
 def call(Map config = [:]) {
-    // Parámetros con valores por defecto
     boolean abortPipeline = config.get('abortPipeline', false)
     
     try {
         echo "Iniciando análisis estático de código..."
         
-        // Ejecución del análisis con timeout de 5 minutos
         timeout(time: 5, unit: 'MINUTES') {
             withEnv(['SONAR_ENV=true']) {
                 sh 'echo "Ejecución de las pruebas de calidad de código"'
@@ -14,9 +12,8 @@ def call(Map config = [:]) {
         
         echo "Análisis estático completado exitosamente"
         
-        // Evaluación del QualityGate
         echo "Evaluando QualityGate..."
-        boolean qualityGatePassed = true // Simulación del resultado
+        boolean qualityGatePassed = true
         
         if (!qualityGatePassed && abortPipeline) {
             error("QualityGate falló y abortPipeline está habilitado. Abortando pipeline...")
